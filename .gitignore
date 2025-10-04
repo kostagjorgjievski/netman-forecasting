@@ -1,0 +1,18 @@
+# python
+__pycache__/
+*.py[cod]
+.venv/
+
+# outputs
+results/
+*.pt
+data/*.csv
+
+# macOS / tooling
+.DS_Store
+structure.txt
+
+# terraform
+*.tfstate
+*.tfstate.*
+.terraform/

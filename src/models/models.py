@@ -1,6 +1,7 @@
+# src/models/models.py
 from .itransformer import Model as ITransformer
 try:
-    from .patchst import Model as PatchTST
+    from .patchtst import Model as PatchTST
 except Exception:
     PatchTST = None
 try:
@@ -17,5 +18,5 @@ REGISTRY = {
 def build_model(name: str, cfg):
     name = name.lower()
     if name not in REGISTRY or REGISTRY[name] is None:
-        raise ValueErrror(f"Unknown or unavailable model: {name}")
+        raise ValueError(f"Unknown or unavailable model: {name}")
     return REGISTRY[name](cfg)

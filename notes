@@ -1,0 +1,6 @@
+Role ARN: arn:aws:iam::329599632202:role/netman-sagemaker-exec
+ECR URI: 329599632202.dkr.ecr.us-east-1.amazonaws.com/netman/pytorch
+
+
+To get tree structure:
+tree -a -L 10 -I '.git|.venv|__pycache__|results|*.pt' > structure.txt

@@ -7,6 +7,18 @@ from src.train_eval import train_epoch, evaluate
 from src.utils import set_seed, auto_device, count_params, csv_log
 import numpy as np
 
+from pathlib import Path
+import json, shutil,
+
+
+# Auto-install dependencies when running in SageMaker
+import sys, subprocess
+from pathlib import Path as _P
+_req = _P(__file__).with_name("requirements.txt")
+if _req.exists():
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", str(_req)])
+
+
 
 def parse_args():
     ap = argparse.ArgumentParser()
@@ -50,7 +62,6 @@ def parse_args():
     ap.add_argument("--revin",     action="store_true")
 
     
-
     # SageMaker-friendly paths (work locally too)
     ap.add_argument("--data_dir", type=str,
         default=os.environ.get("SM_CHANNEL_TRAINING", os.getcwd()))
@@ -64,6 +75,7 @@ def parse_args():
 
 def main():
     args = parse_args()
+    args.workers = min(args.workers, os.cpu_count() or 1) 
     set_seed(args.seed)
     device = auto_device()
 
@@ -141,6 +153,7 @@ def main():
         workers=args.workers
     )
 
+    #Optimizer currently Adam (maybe add scheduler for decaying learning rate)
     opt = torch.optim.AdamW(
         model.parameters(),
         lr=args.lr,
@@ -172,7 +185,8 @@ def main():
     best = math.inf
     for ep in range(start_epoch, args.epochs + 1):
         tr = train_epoch(model, dl_tr, opt, device)
-        vmse, vmae = evaluate(model, dl_va, device)
+        with torch.no_grad():
+            vmse, vmae = evaluate(model, dl_va, device)
         print(f"ep {ep:02d} | train {tr:.4f} | val mse {vmse:.4f} | val mae {vmae:.4f}")
 
         # track best model by validation MSE
@@ -197,15 +211,48 @@ def main():
         model.load_state_dict(state["model"])
     else:
         print("No checkpoints found; testing current in-memory weights.")
-    tmse, tmae = evaluate(model, dl_te, device)
+
+    with torch.no_grad():
+        tmse, tmae = evaluate(model, dl_te, device)
 
     print(f"[TEST] mse {tmse:.4f} | mae {tmae:.4f}")
+
+    os.makedirs(args.logdir, exist_ok=True)
 
     # single-row CSV log
     header = ["model", "dataset", "seq_len", "pred_len", "seed", "mse", "mae", "lr", "batch", "epochs", "params"]
     row = [args.model, os.path.basename(args.csv_path), args.seq_len, args.pred_len,
            args.seed, f"{tmse:.6f}", f"{tmae:.6f}", args.lr, args.batch_size, args.epochs, params]
     csv_log(os.path.join(args.logdir, f"{args.model}.csv"), header, row)
+
+
+
+    model_dir = Path(os.environ.get("SM_MODEL_DIR", "/opt/ml/model"))
+    model_dir.mkdir(parents=True, exist_ok=True)
+
+    # copy best weights if present
+    if os.path.exists(best_model_path):
+        shutil.copy2(best_model_path, model_dir / "model.pt")
+    else:
+        torch.save(model.state_dict(), model_dir / "model.pt")
+
+    # persist metrics + config for downstream
+    with open(model_dir / "metrics.json", "w") as f:
+        json.dump({
+            "model": args.model,
+            "dataset": os.path.basename(args.csv_path),
+            "seq_len": args.seq_len,
+            "pred_len": args.pred_len,
+            "epochs": args.epochs,
+            "mse": float(tmse),
+            "mae": float(tmae),
+            "params": int(params)
+        }, f, indent=2)
+
+    # also archive the one-line CSV next to the model
+    shutil.copy2(os.path.join(args.logdir, f"{args.model}.csv"), model_dir / "results.csv")
+
+
 
 if __name__ == "__main__":
     main()

@@ -1,0 +1,17 @@
+.venv/
+data/
+lightning_logs/
+results/
+__pycache__/
+.git/
+*.pt
+*.pth
+*.zip
+*.tar
+.DS_Store
+terraform/
+report/
+notes/
+docker/
+structure.txt
+aws/spot_launcher.py

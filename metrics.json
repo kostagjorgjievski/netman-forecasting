@@ -1,0 +1,10 @@
+{
+  "model": "itransformer",
+  "dataset": "sample.csv",
+  "seq_len": 96,
+  "pred_len": 96,
+  "epochs": 1,
+  "mse": 0.6714970516780067,
+  "mae": 0.6552818994673472,
+  "params": 4305504
+}

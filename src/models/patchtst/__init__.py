@@ -12,6 +12,7 @@ from .layers.PatchTST_backbone import PatchTST_backbone
 from .layers.PatchTST_layers import series_decomp
 
 
+
 class Model(nn.Module):
     def __init__(self, configs, max_seq_len:Optional[int]=1024, d_k:Optional[int]=None, d_v:Optional[int]=None, norm:str='BatchNorm', attn_dropout:float=0., 
                  act:str="gelu", key_padding_mask:bool='auto',padding_var:Optional[int]=None, attn_mask:Optional[Tensor]=None, res_attention:bool=True, 
@@ -45,6 +46,8 @@ class Model(nn.Module):
         decomposition = configs.decomposition
         kernel_size = configs.kernel_size
         
+
+
         
         # model
         self.decomposition = decomposition
@@ -86,9 +89,37 @@ class Model(nn.Module):
             res = self.model_res(res_init)
             trend = self.model_trend(trend_init)
             x = res + trend
-            x = x.permute(0,2,1)    # x: [Batch, Input length, Channel]
+            # x = x.permute(0,2,1)    # x: [Batch, Input length, Channel]
         else:
             x = x.permute(0,2,1)    # x: [Batch, Channel, Input length]
             x = self.model(x)
-            x = x.permute(0,2,1)    # x: [Batch, Input length, Channel]
+            # x = x.permute(0,2,1)    # x: [Batch, Input length, Channel]
+
+        # ---- Normalize to [B, H, C] regardless of backbone order ----
+        B = x.shape[0]
+        pred_len = self.model.target_window if hasattr(self.model, "target_window") else None
+        c_in     = self.model.c_in if hasattr(self.model, "c_in") else None
+
+        # If we can’t read attrs, infer by size
+        if pred_len is None or c_in is None:
+            # Fall back to guessing: the horizon equals your configured pred_len, channel equals enc_in
+            # (safe because both are known in your configs)
+            from inspect import isclass
+            pred_len = self.target_window if hasattr(self, "target_window") else None
+            c_in     = self.model.c_in if hasattr(self.model, "c_in") else None
+
+        # Heuristic by dimension sizes
+        if x.dim() == 3:
+            if pred_len is not None and c_in is not None:
+                if x.shape[1] == c_in and x.shape[2] == pred_len:   # [B, C, H]
+                    x = x.transpose(1, 2)                           # -> [B, H, C]
+                # elif already [B, H, C], do nothing
+            else:
+                # If we can’t read attrs, assume the *larger* of the last two dims is H when C is smallish
+                if x.shape[1] < x.shape[2]:  # likely [B, C, H]
+                    x = x.transpose(1, 2)    # -> [B, H, C]
+
+        # Take only the last channel (OT) -> [B, H, 1]
+        x = x[..., -1:]
+
         return x

@@ -2,12 +2,20 @@
 __pycache__/
 *.py[cod]
 .venv/
+.venv311/
 
 # outputs
 results/
 *.pt
 data/*.csv
 notes.txt
+checkpoints/
+lambda_graph_build/
+lightning_logs/
+s3_outputs/
+scripts/
+dataset_analasys
+
 
 # macOS / tooling
 .DS_Store
@@ -17,3 +25,8 @@ structure.txt
 *.tfstate
 *.tfstate.*
 .terraform/
+
+
+# Packed model artifacts
+**/model.tar.gz
+last-horizon-results/**/model.tar.gz

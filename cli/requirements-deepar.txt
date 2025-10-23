@@ -1,0 +1,10 @@
+# requirements-deepar.txt
+lightning==2.2.*
+torchmetrics==1.4.*
+gluonts==0.14.4
+numpy>=1.26,<2.0
+pandas>=1.5,<2.2
+scipy==1.12.*
+ujson
+orjson
+
